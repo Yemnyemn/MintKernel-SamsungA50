@@ -1,0 +1,51 @@
+name: Build Blrx-KernelSU A50 (Android 11)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: true   # penting untuk KernelSU
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc bzip2 libelf-dev p7zip-full jq git \
+            python3 python-is-python3
+
+      - name: Patch defconfig (enable KSU + rename kernel)
+        run: |
+          DEFCONFIG="arch/arm64/configs/universal9610_defconfig"
+
+          # Aktifkan KernelSU
+          sed -i '/^CONFIG_KSU=/d' "$DEFCONFIG"
+          echo 'CONFIG_KSU=y' >> "$DEFCONFIG"
+
+          # Rename kernel jadi Blrx-KernelSU
+          sed -i '/^CONFIG_LOCALVERSION=/d' "$DEFCONFIG"
+          sed -i '/^CONFIG_LOCALVERSION_AUTO=/d' "$DEFCONFIG"
+          {
+            echo 'CONFIG_LOCALVERSION="-Blrx-KernelSU"'
+            echo 'CONFIG_LOCALVERSION_AUTO=n'
+          } >> "$DEFCONFIG"
+
+      - name: Build kernel (OneUI Android 11)
+        run: |
+          chmod +x build.sh
+          ./build.sh -d a50 -v oneui -a 11
+
+      - name: Upload kernel zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: Blrx-KernelSU-A50-Android11
+          path: AnyKernel3/*.zip
